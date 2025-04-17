@@ -216,8 +216,8 @@ def handle_text_message(event):
             ),
         )
         
-        # 直接獲取翻譯文本
-        translated_text = response.text
+        # 獲取翻譯文本並清理
+        translated_text = response.text.strip()  # 去除首尾空白
         
         # 回覆翻譯結果
         line_bot_api.reply_message(
