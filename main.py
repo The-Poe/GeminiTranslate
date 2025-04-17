@@ -6,9 +6,14 @@ import time
 import requests
 import threading
 
+# 從環境變數獲取API URL和密鑰
 url = os.getenv('API_URL')
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-model = genai.GenerativeModel("gemini-pro")
+api_key = os.getenv('GOOGLE_API_KEY')
+if not api_key:
+    raise ValueError("需要設置GOOGLE_API_KEY環境變數")
+
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 # Create a Flask object for the REST API
 app = Flask(__name__)
@@ -37,7 +42,7 @@ def get_gemini_translation(text_list, source_lang, target_lang):
   - For each sentence, you can make multiple drafts and choose the one you are most satisfied, and you can also ask a few of your fellow translators to help you revise it, then give me the final best revised translation result.
   - For polysemy words and phrases, please consider the meaning of the word carefully and choose the most appropriate translation.
   - Remember, the ultimate goal is to keep it accurate and have the same meaning as the original sentence, but you absolutely want to make sure the translation is highly understandable and in the expression habits of native speakers, pay close attention to the word order and grammatical issues of the language. 
-  - For sentences that are really difficult to translate accurately, you are allowed to occasionally just translate the meaning for the sake of understandability. It’s important to strike a balance between accuracy and understandability
+  - For sentences that are really difficult to translate accurately, you are allowed to occasionally just translate the meaning for the sake of understandability. It's important to strike a balance between accuracy and understandability
   - Reply only with the finely revised translation and nothing else, no explanation. 
   - For people's names, you can choose to not translate them.
   - If you feel that a word is a proper noun or a code or a formula, choose to leave it as is. 
@@ -52,61 +57,82 @@ def get_gemini_translation(text_list, source_lang, target_lang):
 
   # Example:
   - Input1: <paragraph>I want you to act as a linux terminal. <lb/>I will type commands and you will reply with what the terminal should show. <lb/>I want you <lb/>to only reply with the terminal output inside one unique code block, and nothing else. <lb/>do not write explanations. do not type commands unless I instruct you to do so. When I need to tell you something in English, I will do so by putting text inside brackets (like this). My first command is `pwd`.</paragraph>
-  - Output1: 我想让你扮演一个 linux 终端。<lb/>我将输入命令，你将回复终端应该显示的内容。<lb/>我希望你<lb/>只在一个代码块里回复终端的输出，其他的一概不需要。<lb/>不要写出解释。不要输入命令，除非我指示你这么做。当我需要用英语告诉你一些事的时候，我会把文字放在括号内（像这样）。我的第一个命令是 `pwd`。
+  - Output1: 我想讓你扮演一個 linux 終端。<lb/>我將輸入命令，你將回覆終端應該顯示的內容。<lb/>我希望你<lb/>只在一個代碼塊裡回覆終端的輸出，其他的一概不需要。<lb/>不要寫出解釋。不要輸入命令，除非我指示你這麼做。當我需要用英語告訴你一些事的時候，我會把文字放在括號內（像這樣）。我的第一個命令是 `pwd`。
 
   - Input2: <paragraph>**What About Separation of Concerns?**<lb/>Some users coming from a traditional web development background may have the concern that SFCs are mixing different concerns in the same place - which HTML/CSS/JS were supposed to separate!<lb/>To answer this question, it is important for us to agree that separation of concerns is not equal to the separation of file types. The ultimate goal of frontend engineering principles is to improve the maintainability of codebases. Separation of concerns, when applied dogmatically as separation of file types, does not help us reach that goal in the context of increasingly complex frontend applications.</paragraph>
-  - Output2: **如何看待关注点分离？**<lb/>一些有着传统 Web 开发背景的用户可能会因为 SFC 将不同的关注点集合在一处而有所顾虑，觉得 HTML/CSS/JS 应当是分离开的！<lb/>要回答这个问题，我们必须对这一点达成共识：关注点分离并不等于文件类型的分离。前端工程化的最终目的是为了能够提高代码库的可维护性。关注点分离被教条地应用为文件类型分离时，并不能帮助我们在日益复杂的前端应用的背景下实现这一目标。
+  - Output2: **如何看待關注點分離？**<lb/>一些有著傳統 Web 開發背景的用戶可能會因為 SFC 將不同的關注點集合在一處而有所顧慮，覺得 HTML/CSS/JS 應當是分離開的！<lb/>要回答這個問題，我們必須對這一點達成共識：關注點分離並不等於文件類型的分離。前端工程化的最終目的是為了能夠提高代碼庫的可維護性。關注點分離被教條地應用為文件類型分離時，並不能幫助我們在日益複雜的前端應用的背景下實現這一目標。
 
-  - Input3: Third-party apps like Tweetbot and Twitterific had a relatively small (but devoted) following, but they also played a significant role in defining the culture of Twitter.<lb/> In the early days of Twitter, the company didn’t have its own mobile app, so it was third-party developers that set the standard of how the service should look and feel.<lb/> Third-party apps were often the first to adopt now-expected features like in-line photos and video, and the pull-to-refresh gesture. The apps are also responsible for popularizing the word “tweet” and Twitter’s bird logo.
-  - Output3: Tweetbot 和 Twitterific 等第三方应用程序拥有相对较少的（但忠实的）追随者，但它们在定义 Twitter 文化方面也发挥了重要作用。<lb/>在 Twitter 的早期，该公司没有自己的移动端app，因此是第三方开发者为服务的外观和感觉设定了标准。<lb/>第三方应用程序往往率先采用了现在人们所期待的功能，如内嵌照片和视频以及下拉刷新手势。这些应用程序还让“推文”一词和 Twitter 的小鸟标志深入人心。
+  - Input3: Third-party apps like Tweetbot and Twitterific had a relatively small (but devoted) following, but they also played a significant role in defining the culture of Twitter.<lb/> In the early days of Twitter, the company didn't have its own mobile app, so it was third-party developers that set the standard of how the service should look and feel.<lb/> Third-party apps were often the first to adopt now-expected features like in-line photos and video, and the pull-to-refresh gesture. The apps are also responsible for popularizing the word "tweet" and Twitter's bird logo.
+  - Output3: Tweetbot 和 Twitterific 等第三方應用程序擁有相對較少的（但忠實的）追隨者，但它們在定義 Twitter 文化方面也發揮了重要作用。<lb/>在 Twitter 的早期，該公司沒有自己的移動端app，因此是第三方開發者為服務的外觀和感覺設定了標準。<lb/>第三方應用程序往往率先採用了現在人們所期待的功能，如內嵌照片和視頻以及下拉刷新手勢。這些應用程序還讓「推文」一詞和 Twitter 的小鳥標誌深入人心。
   
   # Original Paragraph: 
   <paragraph>{"<lb/>".join(text_list)}</paragraph>
   
   # Your translation:"""
 
-    # Generate the text response using the model
-    response = model.generate_content(
-        prompt,
-        safety_settings={
-            "HARM_CATEGORY_HARASSMENT": "block_none",
-            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "block_none",
-            "HARM_CATEGORY_HATE_SPEECH": "block_none",
-            "HARM_CATEGORY_DANGEROUS_CONTENT": "block_none",
-        },
-        generation_config=genai.types.GenerationConfig(
-            candidate_count=1,
-            temperature=0.4,
-        ),
-    )
+    try:
+        # Generate the text response using the model
+        response = model.generate_content(
+            prompt,
+            safety_settings={
+                "HARM_CATEGORY_HARASSMENT": "block_none",
+                "HARM_CATEGORY_SEXUALLY_EXPLICIT": "block_none",
+                "HARM_CATEGORY_HATE_SPEECH": "block_none",
+                "HARM_CATEGORY_DANGEROUS_CONTENT": "block_none",
+            },
+            generation_config=genai.types.GenerationConfig(
+                candidate_count=1,
+                temperature=0.4,
+            ),
+        )
 
-    # Get the translated text from the response
-    translated_text_list = response.text.split("<lb/>")
+        # Get the translated text from the response
+        translated_text_list = response.text.split("<lb/>")
 
-
-    # response
-        # translations: 数组，内容为json object， 包括
-            # detected_source_lang: 翻译原文本 {语言代码}
-            # text: 已翻译的文本
-    # Construct the output dictionary
-    output = {
-        "code": 200,
-        "message": "OK",
-        "translations": [{"text": text} for text in translated_text_list],
-    }
+        # Construct the output dictionary
+        output = {
+            "code": 200,
+            "message": "OK",
+            "translations": [{"text": text} for text in translated_text_list],
+        }
+        
+    except Exception as e:
+        # 處理API請求錯誤
+        return jsonify({
+            "code": 500,
+            "message": f"Translation error: {str(e)}",
+            "translations": []
+        })
 
     # Return the output as a JSON response
     return jsonify(output)
 
+# 健康檢查端點，用於Render.com的健康檢查
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy"})
+
+# 如果配置了API_URL，則啟動保活線程
 def request_thread_func(url, interval):
     while True:
-        print(requests.get(url).status_code)
+        try:
+            response = requests.get(url)
+            print(f"Keep-alive request status: {response.status_code}")
+        except Exception as e:
+            print(f"Keep-alive request failed: {str(e)}")
         time.sleep(interval)
-
 
 # Run the app on the local server
 if __name__ == "__main__":
-    interval = 800
-    request_thread = threading.Thread(target=request_thread_func, args=(url, interval))
-    request_thread.start()
-    app.run(host="0.0.0.0", port=80)
+    # 獲取Render.com分配的端口或默認使用5000
+    port = int(os.getenv("PORT", 5000))
+    
+    # 如果設置了API_URL，啟動保活線程
+    if url:
+        interval = 800  # 保活請求間隔，單位為秒
+        request_thread = threading.Thread(target=request_thread_func, args=(url, interval))
+        request_thread.daemon = True  # 設置為守護線程，主程序退出時線程也會退出
+        request_thread.start()
+    
+    # 啟動Flask應用
+    app.run(host="0.0.0.0", port=port)
