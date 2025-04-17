@@ -6,12 +6,19 @@ import time
 import requests
 import threading
 import re
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
 # 從環境變數獲取API URL和密鑰
 url = os.getenv('API_URL')
 api_key = os.getenv('GOOGLE_API_KEY')
 if not api_key:
     raise ValueError("需要設置GOOGLE_API_KEY環境變數")
+
+# 設置LINE Bot
+line_bot_api = LineBotApi(os.getenv('LINE_CHANNEL_ACCESS_TOKEN', ''))
+handler = WebhookHandler(os.getenv('LINE_CHANNEL_SECRET', ''))
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-2.0-flash")
@@ -137,6 +144,60 @@ def get_gemini_translation(text_list, source_lang, target_lang):
 @app.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy"})
+
+# LINE Bot Webhook端點
+@app.route("/callback", methods=['POST'])
+def callback():
+    # 獲取X-Line-Signature頭部
+    signature = request.headers.get('X-Line-Signature', '')
+    
+    # 獲取請求體
+    body = request.get_data(as_text=True)
+    app.logger.info("Request body: %s", body)
+    
+    try:
+        # 驗證簽名
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        app.logger.error("Invalid signature")
+        return jsonify({
+            'code': 400,
+            'message': 'Invalid signature'
+        }), 400
+        
+    # 必須返回200狀態碼
+    return 'OK'
+
+# 處理文本消息
+@handler.add(MessageEvent, message=TextMessage)
+def handle_text_message(event):
+    try:
+        text = event.message.text
+        
+        # 自動偵測語言
+        source_lang = detect_language(text)
+        target_lang = "en" if source_lang == "zh-TW" else "zh-TW"
+        
+        # 處理翻譯
+        result = get_gemini_translation([text], source_lang, target_lang)
+        translated_text = result.get('translations', [{}])[0].get('text', 'Translation error')
+        
+        # 回覆翻譯結果
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=translated_text)
+        )
+    except Exception as e:
+        app.logger.error(f"Error handling message: {str(e)}")
+        # 發生錯誤時回覆錯誤訊息
+        try:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f"翻譯發生錯誤: {str(e)}")
+            )
+        except Exception:
+            app.logger.error("Failed to send error message")
+            pass
 
 # 如果配置了API_URL，則啟動保活線程
 def request_thread_func(url, interval):
